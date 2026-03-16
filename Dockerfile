@@ -14,6 +14,10 @@ RUN apt-get update \
 
 RUN npm install -g openclaw@2026.3.13 clawhub@latest
 
+# Backward-compatibility shim for older OPENCLAW_ENTRY values.
+RUN mkdir -p /openclaw \
+  && ln -sfn /usr/local/lib/node_modules/openclaw/dist /openclaw/dist
+
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
