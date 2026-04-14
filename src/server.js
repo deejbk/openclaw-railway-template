@@ -598,6 +598,9 @@ function runCmd(cmd, args, opts = {}) {
         OPENCLAW_STATE_DIR: STATE_DIR,
         OPENCLAW_WORKSPACE_DIR: WORKSPACE_DIR,
         NODE_OPTIONS: nodeOptions,
+        CI: "true",
+        NO_COLOR: "1",
+        TERM: "dumb",
       },
     });
 
@@ -706,14 +709,8 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
       preflight += `[preflight] openclaw --version exit=${versionResult.code}\n${versionResult.output.trim()}\n`;
       log.info("setup", `preflight --version exit=${versionResult.code} output=${versionResult.output.trim()}`);
 
-      const helpResult = await runCmd(OPENCLAW_NODE, clawArgs(["onboard", "--help"]));
-      preflight += `[preflight] openclaw onboard --help exit=${helpResult.code}\n${helpResult.output.trim()}\n`;
-      log.info("setup", `preflight onboard --help exit=${helpResult.code} outputLen=${helpResult.output.length}`);
-
-      if (helpResult.code !== 0) {
-        log.warn("setup", "onboard subcommand may not exist or binary is broken");
-        preflight += `[preflight] WARNING: onboard --help returned non-zero exit code — the subcommand may be missing or the binary is corrupted\n`;
-      }
+      // Skip "onboard --help" check as it hangs on Railway (likely a TTY/stdin issue in OpenClaw)
+      // We'll just try running the actual onboard command instead
     } catch (preflightErr) {
       preflight += `[preflight] ERROR: ${String(preflightErr)}\n`;
       log.error("setup", `preflight failed: ${String(preflightErr)}`);
