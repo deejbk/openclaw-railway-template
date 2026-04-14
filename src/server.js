@@ -591,6 +591,7 @@ function runCmd(cmd, args, opts = {}) {
       : `${existingNodeOptions} ${heapSizeFlag}`.trim();
 
     const proc = childProcess.spawn(cmd, args, {
+      stdio: ["pipe", "pipe", "pipe"],
       ...opts,
       env: {
         ...process.env,
@@ -601,15 +602,35 @@ function runCmd(cmd, args, opts = {}) {
     });
 
     let out = "";
-    proc.stdout?.on("data", (d) => (out += d.toString("utf8")));
-    proc.stderr?.on("data", (d) => (out += d.toString("utf8")));
+    let outputReceived = false;
+
+    const onData = (d) => {
+      out += d.toString("utf8");
+      outputReceived = true;
+    };
+    proc.stdout?.on("data", onData);
+    proc.stderr?.on("data", onData);
+
+    // Kill the process and report a timeout if no output is produced within 5s
+    const silenceTimer = setTimeout(() => {
+      if (!outputReceived) {
+        out += `\n[timeout] no output received within 5s — killing process\n`;
+        try { proc.kill("SIGKILL"); } catch {}
+      }
+    }, 5000);
 
     proc.on("error", (err) => {
+      clearTimeout(silenceTimer);
       out += `\n[spawn error] ${String(err)}\n`;
       resolve({ code: 127, output: out });
     });
 
+    proc.on("exit", (code, signal) => {
+      log.info("runCmd", `exit event: cmd=${cmd} code=${code} signal=${signal}`);
+    });
+
     proc.on("close", (code, signal) => {
+      clearTimeout(silenceTimer);
       if (signal) {
         out += `\n[process terminated] signal=${signal}\n`;
       }
@@ -675,8 +696,39 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     if (validationError) {
       return res.status(400).json({ ok: false, output: validationError });
     }
+
+    // Preflight: verify the binary is reachable and the onboard subcommand exists
+    log.info("setup", `preflight: checking openclaw binary (${OPENCLAW_NODE} ${OPENCLAW_ENTRY})`);
+    let preflight = "";
+
+    try {
+      const versionResult = await runCmd(OPENCLAW_NODE, clawArgs(["--version"]));
+      preflight += `[preflight] openclaw --version exit=${versionResult.code}\n${versionResult.output.trim()}\n`;
+      log.info("setup", `preflight --version exit=${versionResult.code} output=${versionResult.output.trim()}`);
+
+      const helpResult = await runCmd(OPENCLAW_NODE, clawArgs(["onboard", "--help"]));
+      preflight += `[preflight] openclaw onboard --help exit=${helpResult.code}\n${helpResult.output.trim()}\n`;
+      log.info("setup", `preflight onboard --help exit=${helpResult.code} outputLen=${helpResult.output.length}`);
+
+      if (helpResult.code !== 0) {
+        log.warn("setup", "onboard subcommand may not exist or binary is broken");
+        preflight += `[preflight] WARNING: onboard --help returned non-zero exit code — the subcommand may be missing or the binary is corrupted\n`;
+      }
+    } catch (preflightErr) {
+      preflight += `[preflight] ERROR: ${String(preflightErr)}\n`;
+      log.error("setup", `preflight failed: ${String(preflightErr)}`);
+    }
+
     const onboardArgs = buildOnboardArgs(payload);
-    const onboard = await runCmd(OPENCLAW_NODE, clawArgs(onboardArgs));
+    log.info("setup", `spawning openclaw onboard (args count=${onboardArgs.length})`);
+    let onboard;
+    try {
+      onboard = await runCmd(OPENCLAW_NODE, clawArgs(onboardArgs));
+    } catch (spawnErr) {
+      log.error("setup", `onboard spawn threw: ${String(spawnErr)}`);
+      return res.status(500).json({ ok: false, output: `${preflight}\n[onboard spawn error] ${String(spawnErr)}\n` });
+    }
+    log.info("setup", `openclaw onboard finished: exit=${onboard.code} outputLen=${onboard.output.length}`);
 
     let extra = "";
     extra += `\n[setup] Onboarding exit=${onboard.code} configured=${isConfigured()}\n`;
@@ -784,7 +836,7 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
     return res.status(ok ? 200 : 500).json({
       ok,
-      output: `${onboard.output}${extra}`,
+      output: `${preflight}\n${onboard.output}${extra}`,
     });
   } catch (err) {
     log.error("setup", `run error: ${String(err)}`);
