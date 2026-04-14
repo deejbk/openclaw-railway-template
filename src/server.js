@@ -232,12 +232,19 @@ async function startGateway() {
     "--allow-unconfigured",
   ];
 
+  const existingNodeOptions = process.env.NODE_OPTIONS || "";
+  const heapSizeFlag = "--max-old-space-size=2048";
+  const nodeOptions = existingNodeOptions.includes("--max-old-space-size")
+    ? existingNodeOptions
+    : `${existingNodeOptions} ${heapSizeFlag}`.trim();
+
   gatewayProc = childProcess.spawn(OPENCLAW_NODE, clawArgs(args), {
     stdio: "inherit",
     env: {
       ...process.env,
       OPENCLAW_STATE_DIR: STATE_DIR,
       OPENCLAW_WORKSPACE_DIR: WORKSPACE_DIR,
+      NODE_OPTIONS: nodeOptions,
     },
   });
 
@@ -577,12 +584,19 @@ function buildOnboardArgs(payload) {
 
 function runCmd(cmd, args, opts = {}) {
   return new Promise((resolve) => {
+    const existingNodeOptions = process.env.NODE_OPTIONS || "";
+    const heapSizeFlag = "--max-old-space-size=2048";
+    const nodeOptions = existingNodeOptions.includes("--max-old-space-size")
+      ? existingNodeOptions
+      : `${existingNodeOptions} ${heapSizeFlag}`.trim();
+
     const proc = childProcess.spawn(cmd, args, {
       ...opts,
       env: {
         ...process.env,
         OPENCLAW_STATE_DIR: STATE_DIR,
         OPENCLAW_WORKSPACE_DIR: WORKSPACE_DIR,
+        NODE_OPTIONS: nodeOptions,
       },
     });
 
@@ -1030,6 +1044,12 @@ function createTuiWebSocketServer(httpServer) {
     function spawnPty(cols, rows) {
       if (ptyProcess) return;
 
+      const existingNodeOptions = process.env.NODE_OPTIONS || "";
+      const heapSizeFlag = "--max-old-space-size=2048";
+      const nodeOptions = existingNodeOptions.includes("--max-old-space-size")
+        ? existingNodeOptions
+        : `${existingNodeOptions} ${heapSizeFlag}`.trim();
+
       log.info("tui", `spawning PTY with ${cols}x${rows}`);
       ptyProcess = pty.spawn(OPENCLAW_NODE, clawArgs(["tui"]), {
         name: "xterm-256color",
@@ -1041,6 +1061,7 @@ function createTuiWebSocketServer(httpServer) {
           OPENCLAW_STATE_DIR: STATE_DIR,
           OPENCLAW_WORKSPACE_DIR: WORKSPACE_DIR,
           TERM: "xterm-256color",
+          NODE_OPTIONS: nodeOptions,
         },
       });
 
