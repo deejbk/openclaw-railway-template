@@ -537,7 +537,7 @@ function buildOnboardArgs(payload) {
     "onboard",
     "--non-interactive",
     "--accept-risk",
-    "--json",
+    "--verbose",
     "--no-install-daemon",
     "--skip-health",
     "--workspace",
@@ -609,7 +609,12 @@ function runCmd(cmd, args, opts = {}) {
       resolve({ code: 127, output: out });
     });
 
-    proc.on("close", (code) => resolve({ code: code ?? 0, output: out }));
+    proc.on("close", (code, signal) => {
+      if (signal) {
+        out += `\n[process terminated] signal=${signal}\n`;
+      }
+      resolve({ code: code ?? 1, output: out });
+    });
   });
 }
 
