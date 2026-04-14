@@ -1,0 +1,30 @@
+[1mdiff --git a/src/server.js b/src/server.js[m
+[1mindex 5f784fa..8d2d2e2 100644[m
+[1m--- a/src/server.js[m
+[1m+++ b/src/server.js[m
+[36m@@ -591,7 +591,7 @@[m [mfunction runCmd(cmd, args, opts = {}) {[m
+       : `${existingNodeOptions} ${heapSizeFlag}`.trim();[m
+ [m
+     const proc = childProcess.spawn(cmd, args, {[m
+[31m-      stdio: ["pipe", "pipe", "pipe"],[m
+[32m+[m[32m      stdio: ["ignore", "pipe", "pipe"],[m
+       ...opts,[m
+       env: {[m
+         ...process.env,[m
+[36m@@ -611,13 +611,13 @@[m [mfunction runCmd(cmd, args, opts = {}) {[m
+     proc.stdout?.on("data", onData);[m
+     proc.stderr?.on("data", onData);[m
+ [m
+[31m-    // Kill the process and report a timeout if no output is produced within 5s[m
+[32m+[m[32m    // Kill the process and report a timeout if no output is produced within 60s[m
+     const silenceTimer = setTimeout(() => {[m
+       if (!outputReceived) {[m
+[31m-        out += `\n[timeout] no output received within 5s — killing process\n`;[m
+[32m+[m[32m        out += `\n[timeout] no output received within 60s — killing process\n`;[m
+         try { proc.kill("SIGKILL"); } catch {}[m
+       }[m
+[31m-    }, 5000);[m
+[32m+[m[32m    }, 60000);[m
+ [m
+     proc.on("error", (err) => {[m
+       clearTimeout(silenceTimer);[m

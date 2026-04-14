@@ -591,7 +591,7 @@ function runCmd(cmd, args, opts = {}) {
       : `${existingNodeOptions} ${heapSizeFlag}`.trim();
 
     const proc = childProcess.spawn(cmd, args, {
-      stdio: ["pipe", "pipe", "pipe"],
+      stdio: ["ignore", "pipe", "pipe"],
       ...opts,
       env: {
         ...process.env,
@@ -611,13 +611,13 @@ function runCmd(cmd, args, opts = {}) {
     proc.stdout?.on("data", onData);
     proc.stderr?.on("data", onData);
 
-    // Kill the process and report a timeout if no output is produced within 5s
+    // Kill the process and report a timeout if no output is produced within 60s
     const silenceTimer = setTimeout(() => {
       if (!outputReceived) {
-        out += `\n[timeout] no output received within 5s — killing process\n`;
+        out += `\n[timeout] no output received within 60s — killing process\n`;
         try { proc.kill("SIGKILL"); } catch {}
       }
-    }, 5000);
+    }, 60000);
 
     proc.on("error", (err) => {
       clearTimeout(silenceTimer);
