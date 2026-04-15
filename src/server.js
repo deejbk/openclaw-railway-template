@@ -584,11 +584,7 @@ function buildOnboardArgs(payload) {
 
 function runCmd(cmd, args, opts = {}) {
   return new Promise((resolve) => {
-    const existingNodeOptions = process.env.NODE_OPTIONS || "";
-    const heapSizeFlag = "--max-old-space-size=2048";
-    const nodeOptions = existingNodeOptions.includes("--max-old-space-size")
-      ? existingNodeOptions
-      : `${existingNodeOptions} ${heapSizeFlag}`.trim();
+    const nodeOptions = process.env.NODE_OPTIONS || "";
 
     const proc = childProcess.spawn(cmd, args, {
       stdio: ["ignore", "pipe", "pipe"],
